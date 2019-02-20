@@ -89,6 +89,13 @@ register(
     tags={ "pg_complexity": 300*1000000 },
     )
 
+register(
+    id='RoboschoolSumo-v0',
+    entry_point='roboschool:RoboschoolSumo',
+    max_episode_steps=1000,
+    reward_threshold=2500.0,
+    tags={ "pg_complexity": 8*1000000 },
+    )
 
 # Atlas
 
@@ -122,3 +129,4 @@ from roboschool.gym_humanoid_flagrun import RoboschoolHumanoidFlagrun
 from roboschool.gym_humanoid_flagrun import RoboschoolHumanoidFlagrunHarder
 from roboschool.gym_atlas import RoboschoolAtlasForwardWalk
 from roboschool.gym_pong import RoboschoolPong
+from roboschool.gym_mujoco_sumo import RoboschoolSumo

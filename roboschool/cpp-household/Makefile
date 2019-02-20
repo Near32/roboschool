@@ -48,11 +48,10 @@ ifeq ($(UNAME),Darwin)
   RPATH = -Wl,-undefined,dynamic_lookup
 endif
 
-INC += `$(PKG) --cflags Qt5Widgets Qt5OpenGL assimp bullet`
-LIBS += `$(PKG) --libs Qt5Widgets Qt5OpenGL assimp bullet`
-LIBS    += -lstdc++
-INC     += -I/usr/local/include/bullet
-LIBS    += $(RPATH) -lLinearMath -lBullet3Common -lBulletCollision -lBulletDynamics -lBulletInverseDynamics -lBulletSoftBody -lPhysicsClientC_API
+INC     += `$(PKG) --cflags Qt5Widgets Qt5OpenGL assimp bullet`
+LIBS    += -lstdc++ `$(PKG) --libs Qt5OpenGL Qt5Widgets assimp bullet`
+INC     += -Ibullet_local_install/include -Ibullet_local_install/include/bullet -I/usr/local/include/bullet -I/usr/include/python3.6m
+LIBS    += $(RPATH) -Lbullet_local_install/lib -lLinearMath -lBullet3Common -lBulletCollision -lBulletDynamics -lBulletInverseDynamics -lPhysicsClientC_API -lBulletSoftBody
 
 ifeq ($(PYTHON),2.7)
     BOOST_PYTHON = -lboost_python
