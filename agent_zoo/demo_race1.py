@@ -1,7 +1,27 @@
+from OpenGL import GL
 import os, sys, subprocess
 import numpy as np
 import gym
 import roboschool
+
+def play(env, pi, video):
+    episode_n = 0
+    while 1:
+        episode_n += 1
+        obs = env.reset()
+        if video: 
+            video_recorder = gym.wrappers.monitoring.video_recorder.VideoRecorder(env=env, base_path=("/tmp/demo_race1_episode%i" % episode_n), enabled=True)
+        while 1:
+            a = pi.act(obs,None)
+            obs, rew, done, info = env.step(a)
+            if video: 
+                video_recorder.capture_frame()
+            if done: 
+                break
+        if video: 
+            video_recorder.close()
+            print("Video recorded :: episode {}".format(episode_n))
+        break
 
 if len(sys.argv)==1:
     import roboschool.multiplayer
@@ -42,9 +62,14 @@ else:
 
     pi = PolicyClass("mymodel", env.observation_space, env.action_space)
 
-    while 1:
-        obs = env.reset()
+    if int(sys.argv[2]) == 1:
+        play(env, pi, video=True)
+    else :
         while 1:
-            a = pi.act(obs, None)
-            obs, rew, done, info = env.step(a)
-            if done: break
+            obs = env.reset()
+            while 1:
+                a = pi.act(obs, None)
+                obs, rew, done, info = env.step(a)
+                if int(sys.argv[2])==1:
+                    still_open = env.render("human")
+                if done: break

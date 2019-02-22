@@ -1,3 +1,4 @@
+from OpenGL import GL 
 import os, sys, subprocess
 import numpy as np
 import gym

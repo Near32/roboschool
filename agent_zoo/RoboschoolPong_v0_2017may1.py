@@ -21,6 +21,7 @@ class SmallReactivePolicy:
 
 def demo_run():
     env = gym.make("RoboschoolPong-v1")
+    print(sys.argv, len(sys.argv))
     if len(sys.argv)==3: env.unwrapped.multiplayer(env, sys.argv[1], player_n=int(sys.argv[2]))
 
     pi = SmallReactivePolicy(env.observation_space, env.action_space)

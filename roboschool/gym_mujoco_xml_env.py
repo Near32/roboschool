@@ -48,13 +48,13 @@ class RoboschoolMujocoXmlEnv(gym.Env):
         dump = 0
         for r in self.mjcf:
             if dump: print("ROBOT '%s'" % r.root_part.name)
-            if r.root_part.name==self.robot_name:
+            if r.root_part.name in self.robot_name:
                 self.cpp_robot = r
                 self.robot_body = r.root_part
             for part in r.parts:
                 if dump: print("\tPART '%s'" % part.name)
                 self.parts[part.name] = part
-                if part.name==self.robot_name:
+                if part.name in self.robot_name:
                     self.cpp_robot = r
                     self.robot_body = part
             for j in r.joints:

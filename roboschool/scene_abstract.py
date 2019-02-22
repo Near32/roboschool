@@ -41,7 +41,7 @@ class Scene:
         "Usually after scene reset"
         if not self.multiplayer: return
         self.multiplayer_robots[robot.player_n] = robot
-
+        
     def actor_is_active(self, robot):
         """
         Used by robots to see if they are free to exclusiveley put their HUD on the test window.

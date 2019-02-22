@@ -163,7 +163,6 @@ class SharedMemoryPlayerAgent:
         #
         print("Player %i connected, wants to operate %s in this scene" % (self.player_n, env_id))
         self.env = gym.make(env_id)  # gym.make() creates at least timeout wrapper, we need it.
-
         self.env.unwrapped.scene = self.scene
         self.env.unwrapped.player_n = self.player_n
         assert isinstance(self.env.observation_space, gym.spaces.Box)
