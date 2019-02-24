@@ -8,5 +8,8 @@ while True:
 	# The first sumo does not move, while the second moves randomly:
 	action = env.action_space.sample()
 	action[0:8] = 0.0
-	env.step(action)
+	state, reward, done, info = env.step(action)
 	env.render()
+
+	if done :
+		env.reset()

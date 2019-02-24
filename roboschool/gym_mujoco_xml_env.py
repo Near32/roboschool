@@ -17,7 +17,7 @@ class RoboschoolMujocoXmlEnv(gym.Env):
     VIDEO_W = 600  # for video showing the robot, not for camera ON the robot
     VIDEO_H = 400
 
-    def __init__(self, model_xml, robot_name, action_dim, obs_dim):
+    def __init__(self, model_xml, robot_names, action_dim, obs_dim):
         self.scene = None
 
         high = np.ones([action_dim])
@@ -27,8 +27,8 @@ class RoboschoolMujocoXmlEnv(gym.Env):
         self._seed()
 
         self.model_xml = model_xml
-        self.robot_name = robot_name
-
+        self.robot_names = robot_names
+        
     def _seed(self, seed=None):
         self.np_random, seed = gym.utils.seeding.np_random(seed)
         return [seed]
@@ -39,24 +39,30 @@ class RoboschoolMujocoXmlEnv(gym.Env):
         if not self.scene.multiplayer:
             self.scene.episode_restart()
         self.mjcf = self.scene.cpp_world.load_mjcf(os.path.join(os.path.dirname(__file__), "mujoco_assets", self.model_xml))
+        self.cpp_robots = []
+        self.robot_bodies = []
         self.ordered_joints = []
         self.jdict = {}
         self.parts = {}
         self.frame = 0
         self.done = 0
         self.reward = 0
-        dump = 0
+        dump = 1
         for r in self.mjcf:
             if dump: print("ROBOT '%s'" % r.root_part.name)
-            if r.root_part.name in self.robot_name:
-                self.cpp_robot = r
-                self.robot_body = r.root_part
+            if r.root_part.name in self.robot_names:
+                self.cpp_robots.append(r)
+                self.robot_bodies.append(r.root_part)
+                self.parts[r] = {}
+                self.jdict[r] = {}
             for part in r.parts:
                 if dump: print("\tPART '%s'" % part.name)
-                self.parts[part.name] = part
-                if part.name in self.robot_name:
-                    self.cpp_robot = r
-                    self.robot_body = part
+                self.parts[self.cpp_robots[-1]][part.name] = part
+                if part.name in self.robot_names:
+                    self.cpp_robots.append(r)
+                    self.robot_bodies.append(part)
+                    self.parts[r] = {}
+                    self.jdict[r] = {}
             for j in r.joints:
                 if dump: print("\tALL JOINTS '%s' limits = %+0.2f..%+0.2f effort=%0.3f speed=%0.3f" % ((j.name,) + j.limits()) )
                 if j.name[:6]=="ignore":
@@ -64,14 +70,15 @@ class RoboschoolMujocoXmlEnv(gym.Env):
                     continue
                 j.power_coef = 100.0
                 self.ordered_joints.append(j)
-                self.jdict[j.name] = j
-        assert(self.cpp_robot)
+                self.jdict[self.cpp_robots[-1]][j.name] = j
+        assert(self.cpp_robots)
         self.robot_specific_reset()
         for r in self.mjcf:
             r.query_position()
         s = self.calc_state()    # optimization: calc_state() can calculate something in self.* for calc_potential() to use
         self.potential = self.calc_potential()
         self.camera = self.scene.cpp_world.new_camera_free_float(self.VIDEO_W, self.VIDEO_H, "video_camera")
+        
         return s
 
     def _render(self, mode, close):
