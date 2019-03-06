@@ -110,7 +110,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         # Poses:
         pr_poses = {}
         for cppr,r in zip(self.cpp_robots,self.robot_bodies):
-            pr_poses[cppr] = np.concatenate( [r.pose().xyz(), r.pose().quaternion()]).flatten()
+            pr_poses[cppr] = np.concatenate( [r.pose().xyz(), r.pose().quatertion()]).flatten()
         # nbr_robots x 7
         state["poses"] = pr_poses
         
@@ -210,7 +210,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
             self.episode_over(self.frame)
         else :
             self.done = done
-        
+
         self.rewards = [0.0 for _ in self.cpp_robots]
         if self.done:
             if draw : 

@@ -56,7 +56,7 @@ struct Pose {
 	btTransform convert_to_bt_transform() const { return btTransform(btQuaternion(qx, qy, qz, qw), btVector3(x, y, z)); }
 	void from_bt_transform(const btTransform& tr)  { btVector3 t = tr.getOrigin(); btQuaternion q = tr.getRotation(); set_xyz(t.x()/SCALE, t.y()/SCALE, t.z()/SCALE); set_quaternion(q.x(), q.y(), q.z(), q.w()); }
 	tuple xyz()  { return make_tuple( x/SCALE, y/SCALE, z/SCALE ); }
-	tuple quaternion()  { return make_tuple( qx, qy, qz, qw ); }
+	tuple quatertion()  { return make_tuple( qx, qy, qz, qw ); }
 	tuple rpy()
 	{
 		btScalar sqw = qw*qw;
@@ -615,7 +615,7 @@ void cpp_household_init()
 	.def("set_quaternion", &Pose::set_quaternion)
 	.def("rpy", &Pose::rpy)
 	.def("xyz", &Pose::xyz)
-	.def("quaternion", &Pose::quaternion)
+	.def("quatertion", &Pose::quatertion)
 	.def("rotate_z", &Pose::rotate_z)
 	.def("dot", &Pose::dot)
 	;
