@@ -31,12 +31,16 @@ LIBS    += $(RPATH) -L~/.forked_bullet/lib -lLinearMath -lBullet3Common -lBullet
 export  LD_LIBRARY_PATH=/PATH_TO_QT_ROOT_DIR/5.9.1/gcc_64/lib:$LD_LIBRARY_PATH
 ```
 
-# Issue 3: ".build-debug/render-ssao.o: In function 'SimpleRender::ContextViewport::_depthlinear_paint(int)' "
+# Issue 3: 
 
-Followed by: "cpp-household/render-ssao.cpp:75: undefined reference to `glBindMultiTextureEXT'"
+At compilation time, upon the following error:
+
+```bash 
+.build-debug/render-ssao.o: In function 'SimpleRender::ContextViewport::_depthlinear_paint(int)'
+cpp-household/render-ssao.cpp:75: undefined reference to `glBindMultiTextureEXT'
+```
 
 The issue is solved by exporting the following:
-
 ```bash
 export ROBOSCHOOL_DISABLE_HARDWARE_RENDER=1
 ```
