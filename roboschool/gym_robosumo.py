@@ -196,7 +196,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         per_robot_obs = obs 
 
         # Costs:
-        pr_electricity_cost  = [ self.stall_torque_cost * float(np.square(pr_a).mean()) + self.electricity_cost  * float(np.abs(pr_a*self.joint_speeds).mean()) for pr_a in np.split(a, 2, axis=0)]   # let's assume we have DC motor with controller, and reverse current braking
+        pr_electricity_cost  = [ self.stall_torque_cost * float(np.square(pr_a).mean()) + self.electricity_cost  * float(np.abs(pr_a*pr_joint_speeds).mean()) for pr_a, pr_joint_speeds in zip( np.split(a, 2, axis=0), np.split(self.joint_speeds, 2, axis=0))]   # let's assume we have DC motor with controller, and reverse current braking
         pr_joints_at_limit_cost = [ float(self.joints_at_limit_cost) * jtl for jtl in self.pr_joints_at_limit ]
 
         self.rewards = zip(
@@ -210,11 +210,14 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
             self.episode_over(self.frame)
         
         self.done   += done
-        self.reward += sum(self.rewards)
+        self.rewards = []
+        for alive, el_cost, limit_cost in self.rewards:
+            pr_reward = alive+el_cost+limit_cost 
+            self.rewards.append(pr_reward)
         
         self.HUD(state, a, done)
 
-        return per_robot_obs, sum(self.rewards), bool(done), infos
+        return per_robot_obs, self.rewards, bool(done), infos
 
     def episode_over(self, frames):
         self.done = True 
