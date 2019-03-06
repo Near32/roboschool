@@ -160,6 +160,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
 
         alives = self._compute_alive()
         done = False
+        draw = sum(alives) <= 0.0 or sum(alives) >= 2.0
         for alive in alives: 
             if not alive: 
                 done = True
@@ -199,25 +200,32 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         pr_electricity_cost  = [ self.stall_torque_cost * float(np.square(pr_a).mean()) + self.electricity_cost  * float(np.abs(pr_a*pr_joint_speeds).mean()) for pr_a, pr_joint_speeds in zip( np.split(a, 2, axis=0), np.split(self.joint_speeds, 2, axis=0))]   # let's assume we have DC motor with controller, and reverse current braking
         pr_joints_at_limit_cost = [ float(self.joints_at_limit_cost) * jtl for jtl in self.pr_joints_at_limit ]
 
-        self.rewards = zip(
-            alives,
-            pr_electricity_cost,
-            pr_joints_at_limit_cost,
-            )
+        self.dense_rewards = [] 
+        for alive, el_cost, limit_cost in zip(alives,pr_electricity_cost,pr_joints_at_limit_cost):
+            self.dense_rewards.append( [alive, el_cost, limit_cost] )
 
         self.frame  += 1
         if (done and not self.done) or self.frame==self.spec.timestep_limit:
+            self.done = True 
             self.episode_over(self.frame)
+        else :
+            self.done = done
         
-        self.done   += done
-        self.rewards = []
-        for alive, el_cost, limit_cost in self.rewards:
-            pr_reward = alive+el_cost+limit_cost 
-            self.rewards.append(pr_reward)
+        self.rewards = [0.0 for _ in self.cpp_robots]
+        if self.done:
+            if draw : 
+                self.rewards = [-1000 for _ in self.cpp_robots]
+            else :
+                for idx, alive in enumerate(alives):
+                    pr_reward = 2000.0 if alive else -2000.0
+                    self.rewards[idx] = pr_reward
+                
+        for i in range(len(self.cpp_robots)):
+            infos[i]['dense_rewards'] = self.dense_rewards[i]
         
         self.HUD(state, a, done)
 
-        return per_robot_obs, self.rewards, bool(done), infos
+        return per_robot_obs, self.rewards, self.done, infos
 
     def episode_over(self, frames):
         self.done = True 
