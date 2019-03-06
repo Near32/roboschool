@@ -21,8 +21,8 @@ Change line 50-54 of the ~/roboschool/cpp_household/Makefile with the following.
 ```bash
 INC     += `$(PKG) --cflags Qt5Widgets Qt5OpenGL assimp bullet`
 LIBS    += -lstdc++ `$(PKG) --libs Qt5OpenGL Qt5Widgets assimp bullet`
-INC     += -Ibullet_local_install/include -Ibullet_local_install/include/bullet -I/usr/local/include/bullet -I/usr/include/python3.6m
-LIBS    += $(RPATH) -Lbullet_local_install/lib -lLinearMath -lBullet3Common -lBulletCollision -lBulletDynamics -lBulletInverseDynamics -lPhysicsClientC_API -lBulletSoftBody
+INC     += -I~/.forked_bullet/include -I~/.forked_bullet/include/bullet -I/usr/local/include/bullet -I/usr/include/python3.6m
+LIBS    += $(RPATH) -L~/.forked_bullet/lib -lLinearMath -lBullet3Common -lBulletCollision -lBulletDynamics -lBulletInverseDynamics -lPhysicsClientC_API -lBulletSoftBody
 ```
 
 ## Step 2:

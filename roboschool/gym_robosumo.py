@@ -104,7 +104,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         # nbr_robots x nbr_joints(==2 * nbr_legs == 8) * 2 == 2 x 16
         self.joint_positions = j[0::1]
         self.joint_speeds = j[1::2]
-        self.joints_at_limit = np.count_nonzero(np.abs(j[0::2]) > 0.99)
+        self.pr_joints_at_limit = [ np.count_nonzero(np.abs(prj[0::2]) > 0.99) for prj in np.split(j, 2, axis=0) ]
         state["joints"] = pr_joints
         
         # Poses:
@@ -156,7 +156,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         for i in range(len(self.cpp_robots)):
             infos[i]['ctrl_reward'] = self._compute_after_step(i, a[i])
         
-        state = self.calc_state()  # also calculates self.joints_at_limit
+        state = self.calc_state()
 
         alives = self._compute_alive()
         done = False
@@ -193,19 +193,17 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
             # 7 + 16 + 20 + 7*nbr_opponent(==1) == 50
         
         state = np.concatenate(obs).flatten()
-        pr_state = obs 
+        per_robot_obs = obs 
 
         # Costs:
-        electricity_cost  = self.electricity_cost  * float(np.abs(a*self.joint_speeds).mean())  # let's assume we have DC motor with controller, and reverse current braking
-        electricity_cost += self.stall_torque_cost * float(np.square(a).mean())
+        pr_electricity_cost  = [ self.stall_torque_cost * float(np.square(pr_a).mean()) + self.electricity_cost  * float(np.abs(pr_a*self.joint_speeds).mean()) for pr_a in np.split(a, 2, axis=0)]   # let's assume we have DC motor with controller, and reverse current braking
+        pr_joints_at_limit_cost = [ float(self.joints_at_limit_cost) * jtl for jtl in self.pr_joints_at_limit ]
 
-        joints_at_limit_cost = float(self.joints_at_limit_cost * self.joints_at_limit)
-
-        self.rewards = [
-            *alives,
-            electricity_cost,
-            joints_at_limit_cost,
-            ]
+        self.rewards = zip(
+            alives,
+            pr_electricity_cost,
+            pr_joints_at_limit_cost,
+            )
 
         self.frame  += 1
         if (done and not self.done) or self.frame==self.spec.timestep_limit:
@@ -216,7 +214,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         
         self.HUD(state, a, done)
 
-        return pr_state, sum(self.rewards), bool(done), infos
+        return per_robot_obs, sum(self.rewards), bool(done), infos
 
     def episode_over(self, frames):
         self.done = True 

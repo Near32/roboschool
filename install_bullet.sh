@@ -27,6 +27,5 @@ if [ $(uname) == 'Linux' ]; then
     for lib in $(find $BULLET_PATH/lib -name "*.so.2.87"); do
         patchelf --set-rpath $BULLET_PATH/lib $lib
     done
-    echo "Finished installation successfully."
 fi
 

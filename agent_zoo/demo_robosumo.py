@@ -9,7 +9,7 @@ while True:
 	action = env.action_space.sample()
 	action[0:8] = 0.0
 	state, reward, done, info = env.step(action)
-	env.render()
+	#env.render()
 
 	if done :
 		env.reset()
