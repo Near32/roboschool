@@ -19,15 +19,15 @@ class RoboschoolMujocoXmlEnv(gym.Env):
 
     def __init__(self, model_xml, robot_names, action_dim, obs_dim):
         self.scene = None
-
-        high = np.ones([action_dim])
-        self.action_space = gym.spaces.Box(-high, high)
-        high = np.inf*np.ones([obs_dim])
-        self.observation_space = gym.spaces.Box(-high, high)
-        self._seed()
-
         self.model_xml = model_xml
         self.robot_names = robot_names
+        
+        high = np.ones([action_dim])
+        self.action_space = gym.spaces.Tuple([gym.spaces.Box(-high, high) for _ in self.robot_names])
+        high = 1e17*np.ones([obs_dim])
+        self.observation_space = gym.spaces.Tuple([gym.spaces.Box(-high, high) for _ in self.robot_names])
+        self._seed()
+
         
     def _seed(self, seed=None):
         self.np_random, seed = gym.utils.seeding.np_random(seed)
