@@ -8,16 +8,17 @@ import os, sys
 
 
 class RoboschoolRoboSumo(SharedMemoryClientEnv):
-    COST_COEFS = {
+    REWARDCOST_COEFS = {
         'ctrl': 1e-1,
         # 'pain': 1e-4,
-        # 'attack': 1e-1,
+        'attack': 1e-1,
     }
     tatami_radius = 3.0
     tatami_height = 0.25
 
-    def __init__(self, power):
+    def __init__(self, power, use_reward_shaping=False):
         self.power = power
+        self.use_reward_shaping = use_reward_shaping
         self.camera_x = 0
         '''
         TODO: add reward shaping for the sumos to stay in the middle of the tatami.
@@ -49,23 +50,30 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         '''
         TODO: used by multiplayer stadium to move the agent around the tatami
         '''
-        "Used by multiplayer stadium to move sideways, to another running lane."
-        self.cpp_robots[-1].query_position()
-        pose = self.cpp_robots[-1].root_part.pose()
-        pose.move_xyz(init_x, init_y, init_z)  # Works because robot loads around (0,0,0), and some robots have z != 0 that is left intact
-        self.cpp_robots[-1].set_pose(pose)
-        self.start_pos_x, self.start_pos_y, self.start_pos_z = init_x, init_y, init_z
+        raise NotImplemented 
 
     def apply_action(self, a):
         assert( np.isfinite(a).all() )
         for n,j in enumerate(self.ordered_joints):
             j.set_motor_torque( self.power*j.power_coef*float(np.clip(a[n], -1, +1)) )
 
-    def _compute_after_step(self, robot_idx, action):
-        self.posafter = self.robot_bodies[robot_idx].pose().xyz()
-        # Control cost
-        reward = - self.COST_COEFS['ctrl'] * np.square(action).sum()
-        return reward
+    def _compute_control_cost(self,action):
+        return -self.REWARDCOST_COEFS['ctrl'] * np.square(action).sum()
+
+    def _compute_attack_reward(self, idx1):
+        bodies_speed = [ np.array( b.speed() ).flatten() for b in self.robot_bodies]
+        bodies_xyz = [ np.array(b.pose().xyz() ).flatten() for b in self.robot_bodies]
+        xyz1 = bodies_xyz[idx1]
+        speed1 = bodies_speed[idx1]
+        pr_reward = []
+        for idx2, xyz2 in enumerate(bodies_xyz):
+            if idx1 == idx2:
+                continue
+            dir_1to2 = (xyz2-xyz1)
+            norm = np.linalg.norm(dir_1to2)
+            dir_1to2 /= (1e-3+ norm)
+            pr_reward.append(self.REWARDCOST_COEFS['attack'] * np.dot(dir_1to2, speed1).sum() ) 
+        return sum(pr_reward)
 
     def _compute_alive(self):
         self.contact_with_floor = {}
@@ -80,8 +88,6 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
 
     electricity_cost     = -2.0    # cost for using motors -- this parameter should be carefully tuned against reward for making progress, other values less improtant
     stall_torque_cost    = -0.1    # cost for running electric current through a motor even at zero rotational speed, small
-    foot_collision_cost  = -1.0    # touches another leg, or other objects, that cost makes robot avoid smashing feet into itself
-    foot_ground_object_names = set(["floor"])  # to distinguish ground and other objects
     joints_at_limit_cost = -0.2    # discourage stuck joints
 
     def calc_state(self):
@@ -157,10 +163,15 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         rewards = [0. for _ in range(len(self.cpp_robots))]
         infos = [{} for _ in range(len(self.cpp_robots))]
 
+        pr_a = np.split(a, 2, axis=0)
+        pr_ctrl_cost = []
+        pr_attack_reward = []
         for i in range(len(self.cpp_robots)):
-            infos[i]['ctrl_reward'] = self._compute_after_step(i, a[i])
+            pr_ctrl_cost.append( self._compute_control_cost(pr_a[i]) )
+            pr_attack_reward.append( self._compute_attack_reward(i) )
         
         per_robot_obs = self.calc_state()
+
 
         alives = self._compute_alive()
         done = False
@@ -182,8 +193,8 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         pr_joints_at_limit_cost = [ float(self.joints_at_limit_cost) * jtl for jtl in self.pr_joints_at_limit ]
 
         self.dense_rewards = [] 
-        for alive, el_cost, limit_cost in zip(alives,pr_electricity_cost,pr_joints_at_limit_cost):
-            self.dense_rewards.append( [alive, el_cost, limit_cost] )
+        for alive, el_cost, limit_cost, ctrl_cost, attack_reward in zip(alives,pr_electricity_cost,pr_joints_at_limit_cost, pr_ctrl_cost, pr_attack_reward ):
+            self.dense_rewards.append( sum([alive, el_cost, limit_cost, ctrl_cost, attack_reward]) )
 
         self.frame  += 1
         if (done and not self.done) or self.frame==self.spec.timestep_limit:
@@ -192,7 +203,10 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         else :
             self.done = done
 
-        self.rewards = [0.0 for _ in self.cpp_robots]
+        if self.use_reward_shaping:
+            self.rewards = self.dense_rewards
+        else :
+            self.rewards = [0.0 for _ in self.cpp_robots]
         if self.done:
             if draw : 
                 self.rewards = [-1000 for _ in self.cpp_robots]
@@ -202,7 +216,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
                     self.rewards[idx] = pr_reward
                 
         for i in range(len(self.cpp_robots)):
-            infos[i]['dense_rewards'] = self.dense_rewards[i]
+            infos[i]['dense_reward'] = self.dense_rewards[i]
         
         self.HUD(self.state4HUD, a, done)
 
