@@ -11,11 +11,13 @@
   <worldbody>
     <body name="tatami" pos="0 0 0.125">
       <geom name="tatami_geom" conaffinity="11" contype="01" pos="0 0 0" size="3.0" fromto="0.0 0.0 0.0 0.0 0.0 0.25" type="cylinder" rgba=".8 .2 .2 1"/>
-      <joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/>
+      <!--joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/-->
     </body>
+  </worldbody>
+  <worldbody>
     <body name="ant0" pos="0 -1.5 3.0">
       <geom name="ant0_torso_geom" pos="0 0 0" size="0.25" type="sphere" rgba=".2 .4 .6 1"/>
-      <joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/>
+      <!--joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/-->
       <body name="ant0_front_left_leg" pos="0 0 0">
         <geom fromto="0.0 0.0 0.0 0.2 0.2 0.0" name="ant0_aux_1_geom" size="0.08" type="capsule" rgba=".2 .5 .7 1"/>
         <body name="ant0_aux_1" pos="0.2 0.2 0">
@@ -65,7 +67,7 @@
   <worldbody>
     <body name="ant1" pos="0 1.5 3.0">
       <geom name="ant1_torso_geom" conaffinity="01" contype="10" pos="0 0 0" size="0.25" type="sphere"/>
-      <joint armature="0" damping="0" limited="false" margin="0.01" name="root_ant1" pos="0 0 0" type="free"/>
+      <!--joint armature="0" damping="0" limited="false" margin="0.01" name="root_ant1" pos="0 0 0" type="free"/-->
       <body name="ant1_front_left_leg" pos="0 0 0">
         <geom fromto="0.0 0.0 0.0 0.2 0.2 0.0" name="ant1_aux_1_geom" conaffinity="01" contype="10" size="0.08" type="capsule" rgba=".8 .5 .3 1"/>
         <body name="ant1_aux_1" pos="0.2 0.2 0">
