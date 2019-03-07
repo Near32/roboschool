@@ -6,6 +6,7 @@ import gym, gym.spaces, gym.utils, gym.utils.seeding
 import numpy as np
 import os, sys
 
+
 class RoboschoolRoboSumo(SharedMemoryClientEnv):
     COST_COEFS = {
         'ctrl': 1e-1,
@@ -19,9 +20,9 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         self.power = power
         self.camera_x = 0
         '''
-        TODO: change the target value as an objective to stay on the tatami, maybe?
+        TODO: add reward shaping for the sumos to stay in the middle of the tatami.
         '''
-        self.sumo_target_x = 1e3  # kilometer away
+        self.sumo_target_x = 0
         self.sumo_target_y = 0
         self.start_pos_x, self.start_pos_y, self.start_pos_z = 0, 0, 0
         self.camera_x = 0
@@ -84,7 +85,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
     joints_at_limit_cost = -0.2    # discourage stuck joints
 
     def calc_state(self):
-        state = {}
+        self.state = {}
         
         # Joints:
         j = np.array([j.current_relative_position() for j in self.ordered_joints], dtype=np.float32).flatten()
@@ -93,30 +94,23 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         pr_joints = {}
         for cppr in self.cpp_robots:
             pr_joints[cppr] = np.concatenate([ self.jdict[cppr][joint_name].current_relative_position() for joint_name in self.jdict[cppr] ]).flatten()
-        '''
-        # DEBUG:
-        pr_joints = [ [ self.jdict[cppr][joint_name].current_relative_position() for joint_name in self.jdict[cppr] ] for cppr in self.cpp_robots]
-        for r in pr_joints:
-            for ij, j in enumerate(r):
-                print('joint {} :'.format(ij), j)
-        '''
-        #pr_joints : per-robot list of joints:
         # nbr_robots x nbr_joints(==2 * nbr_legs == 8) * 2 == 2 x 16
         self.joint_positions = j[0::1]
         self.joint_speeds = j[1::2]
         self.pr_joints_at_limit = [ np.count_nonzero(np.abs(prj[0::2]) > 0.99) for prj in np.split(j, 2, axis=0) ]
-        state["joints"] = pr_joints
+        self.state["joints"] = pr_joints
         
         # Poses:
         pr_poses = {}
         for cppr,r in zip(self.cpp_robots,self.robot_bodies):
             pr_poses[cppr] = np.concatenate( [r.pose().xyz(), r.pose().quatertion()]).flatten()
         # nbr_robots x 7
-        state["poses"] = pr_poses
+        self.state["poses"] = pr_poses
         
         bodies_pose = [b.pose() for b in self.robot_bodies]
         parts_xyz = [ np.array( [p.pose().xyz() for p in self.parts[cppr].values()] ).flatten() for cppr in self.cpp_robots]
         self.bodies_xyz = [ (p_xyz[0::3].mean(), p_xyz[1::3].mean(), b_pose.xyz()[2]) for p_xyz, b_pose in zip(parts_xyz,bodies_pose) ]  # torso z is more informative than mean z
+        self.body_xyz = self.bodies_xyz[0]
         self.bodies_rpy = [ b_pose.rpy() for b_pose in bodies_pose]
 
         # Contacts: 
@@ -124,24 +118,34 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         for cppr in self.cpp_robots:
             pr_contacts[cppr] = np.array( [ len(self.parts[cppr][part_name].contact_list() ) for part_name in self.parts[cppr] ] ).flatten()
         # nbr_robots x nbr_parts (==8) * 1
-        '''
-        # DEBUG:
-        for cppr in self.cpp_robots:
-            for name in self.parts[cppr]:
-                print("\t {} contact(s):".format( len(self.parts[cppr][name].contact_list()) ))
-                for el in self.parts[cppr][name].contact_list():
-                    print("\t\t {}".format(el.name) )
-        '''
-        state["contacts"] = pr_contacts
+        self.state["contacts"] = pr_contacts
         
-        return state
+        # Observations:
+        obs = [ [] for cppr in self.cpp_robots]
+        for idxr, cppr in enumerate(self.cpp_robots):
+            obs[idxr].append(self.state["poses"][cppr]) 
+            # pose: x,y,z, qx,qy,qz,qw : 7
+            obs[idxr].append( self.state["joints"][cppr])
+            # joints: nbr_joints(==2 * nbr_legs == 8) * 2 ==  16
+            obs[idxr].append( self.state["contacts"][cppr])
+            # contacts: nbr_parts*1 == 20 
+            for cppo in self.cpp_robots:
+                if cppr != cppo :
+                    obs[idxr].append(self.state["poses"][cppo]) 
+                    # opponent pose: x,y,z, qx,qy,qz,qw : 7
+            obs[idxr] = np.concatenate(obs[idxr]).flatten()
+            # 7 + 16 + 20 + 7*nbr_opponent(==1) == 50
+        
+        self.state4HUD = np.concatenate(obs).flatten()
+        per_robot_obs = obs
+
+        return per_robot_obs
     
     def _step(self, a):
         # :param a: assumes either a list of actions for each sumo 
         # or a concatenation of both actions into one array, 
         # with sumo0's actions followed by sumo1's actions.
-        if isinstance(a,list):
-            a = np.concatenate(a, axis=0)
+        a = np.concatenate([*a], axis=0).flatten()
 
         # the multiplayer support for this environment is embedded into the step/reset mechanisms...
         assert(not self.scene.multiplayer)  
@@ -156,7 +160,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         for i in range(len(self.cpp_robots)):
             infos[i]['ctrl_reward'] = self._compute_after_step(i, a[i])
         
-        state = self.calc_state()
+        per_robot_obs = self.calc_state()
 
         alives = self._compute_alive()
         done = False
@@ -166,35 +170,12 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
                 done = True
                 break
 
-        for key in state:
-            for cppr in state[key]:
-                for el in state[key][cppr]:
+        for key in self.state:
+            for cppr in self.state[key]:
+                for el in self.state[key][cppr]:
                     if not np.isfinite(el).all():
-                        print("~INF~", state)
                         done = True
-                        break
-
-        # Observations:
-        obs = [ [] for cppr in self.cpp_robots]
-        for idxr, cppr in enumerate(self.cpp_robots):
-            obs[idxr].append(state["poses"][cppr]) 
-            #print('dim state :', state["poses"][cppr].shape)
-            # pose: x,y,z, qx,qy,qz,qw : 7
-            obs[idxr].append( state["joints"][cppr])
-            #print('dim joints :', state["joints"][cppr].shape)
-            # joints: nbr_joints(==2 * nbr_legs == 8) * 2 ==  16
-            obs[idxr].append( state["contacts"][cppr])
-            #print('dim contacts :',state["contacts"][cppr].shape)
-            # contacts: nbr_parts*1 == 20 
-            for cppo in self.cpp_robots:
-                if cppr != cppo :
-                    obs[idxr].append(state["poses"][cppo]) 
-                    # opponent pose: x,y,z, qx,qy,qz,qw : 7
-            obs[idxr] = np.concatenate(obs[idxr]).flatten()
-            # 7 + 16 + 20 + 7*nbr_opponent(==1) == 50
-        
-        state = np.concatenate(obs).flatten()
-        per_robot_obs = obs 
+                        break 
 
         # Costs:
         pr_electricity_cost  = [ self.stall_torque_cost * float(np.square(pr_a).mean()) + self.electricity_cost  * float(np.abs(pr_a*pr_joint_speeds).mean()) for pr_a, pr_joint_speeds in zip( np.split(a, 2, axis=0), np.split(self.joint_speeds, 2, axis=0))]   # let's assume we have DC motor with controller, and reverse current braking
@@ -223,7 +204,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         for i in range(len(self.cpp_robots)):
             infos[i]['dense_rewards'] = self.dense_rewards[i]
         
-        self.HUD(state, a, done)
+        self.HUD(self.state4HUD, a, done)
 
         return per_robot_obs, self.rewards, self.done, infos
 
