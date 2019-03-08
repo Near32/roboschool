@@ -5,13 +5,14 @@ import gym
 env = gym.make('RoboschoolSumo-v0')
 env.reset()
 while True:
-	# The first sumo does not move, while the second moves randomly:
-	action = env.action_space.sample()
-	#action[0][0:8] = 0.0
-	state, reward, done, info = env.step(action)
-	env.render()
+    # The first sumo does not move, while the second moves randomly:
+    action = env.action_space.sample()
+    action[0][0:8] = 0.0
+    action[1][0:8] = 0.0
+    state, reward, done, info = env.step(action)
+    env.render()
 
-	if done :
-		env.reset()
-		break
-		#print('environment resetted...')
+    if done :
+        env.reset()
+        break
+        #print('environment resetted...')
