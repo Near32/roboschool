@@ -92,7 +92,7 @@ register(
 register(
     id='RoboschoolSumo-v0',
     entry_point='roboschool:RoboschoolSumo',
-    max_episode_steps=1000,
+    max_episode_steps=500,
     reward_threshold=2500.0,
     tags={ "pg_complexity": 8*1000000 },
     )
@@ -100,7 +100,7 @@ register(
 register(
     id='RoboschoolSumoWithRewardShaping-v0',
     entry_point='roboschool:RoboschoolSumoWithRewardShaping',
-    max_episode_steps=1000,
+    max_episode_steps=500,
     reward_threshold=2500.0,
     tags={ "pg_complexity": 8*1000000 },
     )
