@@ -23,9 +23,9 @@ class RoboschoolMujocoXmlEnv(gym.Env):
         self.robot_names = robot_names
         
         high = np.ones([action_dim])
-        self.action_space = gym.spaces.Tuple([gym.spaces.Box(-high, high) for _ in self.robot_names])
+        self.action_space = gym.spaces.Tuple([gym.spaces.Box(-high, high, dtype='float32') for _ in self.robot_names])
         high = 1e17*np.ones([obs_dim])
-        self.observation_space = gym.spaces.Tuple([gym.spaces.Box(-high, high) for _ in self.robot_names])
+        self.observation_space = gym.spaces.Tuple([gym.spaces.Box(-high, high, dtype='float32') for _ in self.robot_names])
         self._seed()
 
         
