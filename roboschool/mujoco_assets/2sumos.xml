@@ -15,7 +15,7 @@
     </body>
   </worldbody>
   <worldbody>
-    <body name="ant0" pos="0 -1.5 3.0">
+    <body name="ant0" pos="0 -1.5 1.0">
       <geom name="ant0_torso_geom" pos="0 0 0" size="0.25" type="sphere" rgba=".2 .4 .6 1"/>
       <!--joint armature="0" damping="0" limited="false" margin="0.01" name="root" pos="0 0 0" type="free"/-->
       <body name="ant0_front_left_leg" pos="0 0 0">
@@ -65,7 +65,7 @@
     </body>
   </worldbody>
   <worldbody>
-    <body name="ant1" pos="0 1.5 3.0">
+    <body name="ant1" pos="0 1.5 1.0">
       <geom name="ant1_torso_geom" conaffinity="01" contype="10" pos="0 0 0" size="0.25" type="sphere"/>
       <!--joint armature="0" damping="0" limited="false" margin="0.01" name="root_ant1" pos="0 0 0" type="free"/-->
       <body name="ant1_front_left_leg" pos="0 0 0">
