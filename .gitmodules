@@ -1,0 +1,3 @@
+[submodule "Generalized-RL-Self-Play-Framework"]
+	path = Generalized-RL-Self-Play-Framework
+	url = https://github.com/Danielhp95/Generalized-RL-Self-Play-Framework
