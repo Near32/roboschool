@@ -5,7 +5,7 @@ from roboschool.gym_mujoco_xml_env import RoboschoolMujocoXmlEnv
 import gym, gym.spaces, gym.utils, gym.utils.seeding
 import numpy as np
 import os, sys
-
+import math 
 
 class RoboschoolRoboSumo(SharedMemoryClientEnv):
     REWARDCOST_COEFS = {
@@ -45,7 +45,20 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
                    self.feet[r].append( self.parts[r][f] )
         self.feet_contact = np.array([0.0 for f in self.foot_list], dtype=np.float32)
         self.scene.actor_introduce(self)
+
+        #Rotate the second sumo:
+        [ cppr.query_position() for cppr in self.cpp_robots]
+        pose = self.cpp_robots[1].root_part.pose()
+        pose.rotate_z(np.pi) 
+        self.cpp_robots[1].set_pose(pose)
+        [ cppr.query_position() for cppr in self.cpp_robots]
         
+        #Initialize init_poses:
+        self.init_poses = [cppr.root_part.pose() for cppr in self.cpp_robots]
+        self.init_matrices = [ self._from_pose_to_matrix(pose) for pose in self.init_poses]
+        self.init_transforms = [ self._from_matrix_to_transform(matrix) for matrix in self.init_matrices]
+        self.inv_init_transforms = [ np.linalg.inv( tr ) for tr in self.init_transforms]
+
     def move_robot(self, init_x, init_y, init_z):
         '''
         TODO: used by multiplayer stadium to move the agent around the tatami
@@ -90,6 +103,75 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
     stall_torque_cost    = -0.1    # cost for running electric current through a motor even at zero rotational speed, small
     joints_at_limit_cost = -0.2    # discourage stuck joints
 
+    def _from_quaternion_to_matrix(self, qx, qy, qz, qw):
+        R = np.matrix( [[1-2*qy*qy-2*qz*qz, 2*qx*qy-2*qz*qw, 2*qx*qz + 2*qy*qw],
+                        [2*qx*qy+2*qz*qw, 1-2*qx*qx-2*qz*qz, 2*qy*qz-2*qx*qw],
+                        [2*qx*qz-2*qy*qw, 2*qy*qz+2*qx*qw, 1-2*qx*qx-2*qy*qy] ])
+        return R    
+
+    def _from_matrix_to_quaternion(self, R):
+        tr = R[0,0] + R[1,1] + R[2,2]
+        if tr > 0: 
+          S = math.sqrt(tr+1.0) * 2 # S=4*qw
+          qw = 0.25 * S
+          qx = (R[2,1] - R[1,2]) / S;
+          qy = (R[0,2] - R[2,0]) / S; 
+          qz = (R[1,0] - R[0,1]) / S; 
+        elif ((R[0,0] > R[1,1]) and (R[0,0] > R[2,2])): 
+          S = math.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2 # S=4*qx 
+          qw = (R[2,1] - R[1,2]) / S;
+          qx = 0.25 * S;
+          qy = (R[0,1] + R[1,0]) / S; 
+          qz = (R[0,2] + R[2,0]) / S; 
+        elif (R[1,1] > R[2,2]):
+          S = math.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2 # S=4*qy
+          qw = (R[0,2] - R[2,0]) / S;
+          qx = (R[0,1] + R[1,0]) / S; 
+          qy = 0.25 * S;
+          qz = (R[1,2] + R[2,1]) / S; 
+        else: 
+          S = math.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2 # S=4*qz
+          qw = (R[1,0] - R[0,1]) / S;
+          qx = (R[0,2] + R[2,0]) / S;
+          qy = (R[1,2] + R[2,1]) / S;
+          qz = 0.25 * S;
+        
+        return [qx, qy, qz, qw]
+
+    def _from_pose_to_matrix(self, pose):
+        t = pose.xyz()
+        q = pose.quatertion()
+        rotation = self._from_quaternion_to_matrix(*q)
+        M = np.eye(4)
+        M[0:3,0:3] = rotation
+        M[0,3] = t[0]
+        M[1,3] = t[1]
+        M[2,3] = t[2]
+        return M
+
+    def _from_matrix_to_transform(self, M):
+        R = np.linalg.inv( M[0:3,0:3])
+        H = np.eye(4)
+        H[0:3,0:3] = R
+        H[0:3,3] = -R.dot(M[0:3,3])
+        return H
+    
+    def _transform_position_of_fromGto_(self, pose, idx):
+        M_rInG = self._from_pose_to_matrix( pose )
+        p_rInG = M_rInG[0:3,3]
+        M_IdxInG = self.init_matrices[idx]
+        p_IdxInG = M_IdxInG[0:3,3]
+        H_GToIdx = self.init_transforms[idx] 
+        p_rInIdx = H_GToIdx[0:3,0:3].dot(p_rInG-p_IdxInG).flatten()
+        return p_rInIdx 
+
+    def _transform_orientation_of_fromGto_(self, pose, idx):
+        M_rInG = self._from_pose_to_matrix( pose )
+        M_IdxInG = self.init_matrices[idx]
+        rotation_rInIdx = np.linalg.inv( M_IdxInG[0:3,0:3]).dot( M_rInG[0:3,0:3])
+        q_rInIdx = np.array( self._from_matrix_to_quaternion(rotation_rInIdx) ).flatten()
+        return q_rInIdx 
+
     def calc_state(self):
         self.state = {}
         
@@ -108,8 +190,10 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
         
         # Poses:
         pr_poses = {}
-        for cppr,r in zip(self.cpp_robots,self.robot_bodies):
-            pr_poses[cppr] = np.concatenate( [r.pose().xyz(), r.pose().quatertion()]).flatten()
+        for idx, (cppr,r) in enumerate(zip(self.cpp_robots,self.robot_bodies) ):
+            pose = r.pose()    
+            pr_poses[cppr] = np.concatenate( [ self._transform_position_of_fromGto_( pose, idx), self._transform_orientation_of_fromGto_(pose, idx) ]).flatten() 
+        
         # nbr_robots x 7
         self.state["poses"] = pr_poses
         
@@ -135,10 +219,12 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
             # joints: nbr_joints(==2 * nbr_legs == 8) * 2 ==  16
             obs[idxr].append( self.state["contacts"][cppr])
             # contacts: nbr_parts*1 == 20 
-            for cppo in self.cpp_robots:
+            for cppo, o in zip(self.cpp_robots, self.robot_bodies):
                 if cppr != cppo :
-                    obs[idxr].append(self.state["poses"][cppo]) 
-                    # opponent pose: x,y,z, qx,qy,qz,qw : 7
+                    pose = o.pose()
+                    pose_oInr = np.concatenate( [ self._transform_position_of_fromGto_( pose, idxr), self._transform_orientation_of_fromGto_(pose, idxr) ]).flatten() 
+                    obs[idxr].append( pose_oInr ) 
+                # opponent pose: x,y,z, qx,qy,qz,qw : 7
             obs[idxr] = np.concatenate(obs[idxr]).flatten()
             # 7 + 16 + 20 + 7*nbr_opponent(==1) == 50
         
