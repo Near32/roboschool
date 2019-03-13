@@ -9,9 +9,9 @@ import math
 
 class RoboschoolRoboSumo(SharedMemoryClientEnv):
     REWARDCOST_COEFS = {
-        'ctrl': 1e-1,
+        'ctrl': 1e-2,
         # 'pain': 1e-4,
-        'attack': 1e-1,
+        'attack': 1e+1,
     }
     tatami_radius = 3.0
     tatami_height = 0.25
@@ -90,16 +90,29 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
 
     def _compute_alive(self):
         self.contact_with_floor = {}
+        self.contact_with_tatami = {}
         pr_contacts = {} 
+        pr_contacts_above_foot = {}
+        
         for cppr in self.cpp_robots:
             pr_contacts[cppr] = []
+            pr_contacts_above_foot[cppr] = []
+
             for part_name in self.parts[cppr]:
                 contact_names = [ x.name for x in self.parts[cppr][part_name].contact_list()]
-                pr_contacts[cppr] += contact_names 
-            self.contact_with_floor[cppr] = 1.0 if not('floor' in pr_contacts[cppr]) else 0.0
-        return self.contact_with_floor.values()
+                pr_contacts[cppr] += contact_names
+                if "foot" in part_name:
+                    continue 
+                else :
+                    pr_contacts_above_foot[cppr] += contact_names
 
-    electricity_cost     = -2.0    # cost for using motors -- this parameter should be carefully tuned against reward for making progress, other values less improtant
+            self.contact_with_floor[cppr] = 1.0 if not('floor' in pr_contacts[cppr]) else 0.0
+            self.contact_with_tatami[cppr] = 1.0 if not('tatami' in pr_contacts_above_foot[cppr]) else 0.0 
+        
+        alives = [ cf*ct for cf,ct in zip(self.contact_with_floor.values(), self.contact_with_tatami.values() )]
+        return alives
+
+    electricity_cost     = -1.0    # cost for using motors -- this parameter should be carefully tuned against reward for making progress, other values less improtant
     stall_torque_cost    = -0.1    # cost for running electric current through a motor even at zero rotational speed, small
     joints_at_limit_cost = -0.2    # discourage stuck joints
 
@@ -216,7 +229,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
             obs[idxr].append(self.state["poses"][cppr]) 
             # pose: x,y,z, qx,qy,qz,qw : 7
             obs[idxr].append( self.state["joints"][cppr])
-            # joints: nbr_joints(==2 * nbr_legs == 8) * 2 ==  16
+            # joints: nbr_joints(==2 * nbr_legs == 8) * 2 (position and velocity) ==  16
             obs[idxr].append( self.state["contacts"][cppr])
             # contacts: nbr_parts*1 == 20 
             for cppo, o in zip(self.cpp_robots, self.robot_bodies):
@@ -225,7 +238,7 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
                     pose_oInr = np.concatenate( [ self._transform_position_of_fromGto_( pose, idxr), self._transform_orientation_of_fromGto_(pose, idxr) ]).flatten() 
                     obs[idxr].append( pose_oInr ) 
                 # opponent pose: x,y,z, qx,qy,qz,qw : 7
-            obs[idxr] = np.concatenate(obs[idxr]).flatten()
+            obs[idxr] = np.reshape( np.concatenate(obs[idxr]).flatten(), newshape=(1,-1) )
             # 7 + 16 + 20 + 7*nbr_opponent(==1) == 50
         
         self.state4HUD = np.concatenate(obs).flatten()
@@ -280,7 +293,9 @@ class RoboschoolRoboSumo(SharedMemoryClientEnv):
 
         self.dense_rewards = [] 
         for alive, el_cost, limit_cost, ctrl_cost, attack_reward in zip(alives,pr_electricity_cost,pr_joints_at_limit_cost, pr_ctrl_cost, pr_attack_reward ):
-            self.dense_rewards.append( sum([alive, el_cost, limit_cost, ctrl_cost, attack_reward]) )
+            #self.dense_rewards.append( sum([alive, el_cost, limit_cost, ctrl_cost, attack_reward]) )
+            self.dense_rewards.append( sum([attack_reward]) )
+
 
         self.frame  += 1
         if (done and not self.done) or self.frame==self.spec.timestep_limit:

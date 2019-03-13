@@ -45,6 +45,8 @@ The issue is solved by exporting the following:
 export ROBOSCHOOL_DISABLE_HARDWARE_RENDER=1
 ```
 
+or apparently it is not sufficient...
+
 # Issue 4: 
 
 Upon the following error, while trying to render an environment:
@@ -64,3 +66,49 @@ In summary, the problem comes from when python dynamically loads the required Op
 
 A workaround is to import GL as so `from OpenGL import GL` within a zoo file."
 
+# Issue 5:
+
+Upon the following error, while trying to install boost for a virtualenv/pipenv:
+
+```
+./boost/python/detail/wrap_python.hpp:50:23: fatal error: pyconfig.h: No such file or directory
+ # include <pyconfig.h>
+```
+
+One solution/tweak consists of exporting a environment variable where pyconfig.h sits:
+
+```
+export CPLUS_INCLUDE_PATH=/usr/include/python3.5m
+```
+
+# Issue 6:
+
+Upon the following erro, while trying to compile roboschool/cpp_household:
+
+```
+
+```
+
+One solution consist of changin line 8 of the Makefile with:
+
+```
+LIBS =-L/usr/lib64 -lm -lGL -L$(HOME)/.boost/lib -L$(HOME)/.forked_bullet/lib
+```
+
+# Issue 7:
+
+Upon re-entering the virtualenv that have been previously configure, it is required to export the two environment variables specified in Issue 2 above.
+Otherwise this issue occurs when trying to import roboschool:
+
+```
+>>> import roboschool
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/home/kevin/Development/git/roboschool/roboschool/__init__.py", line 127, in <module>
+    from roboschool.gym_pendulums import RoboschoolInvertedPendulum
+  File "/home/kevin/Development/git/roboschool/roboschool/gym_pendulums.py", line 1, in <module>
+    from roboschool.scene_abstract import SingleRobotEmptyScene
+  File "/home/kevin/Development/git/roboschool/roboschool/scene_abstract.py", line 12, in <module>
+    from roboschool  import cpp_household   as cpp_household
+ImportError: /home/kevin/Development/git/roboschool/roboschool/cpp_household.so: symbol _ZTI13QOpenGLWidget, version Qt_5 not defined in file libQt5Widgets.so.5 with link time reference
+```
